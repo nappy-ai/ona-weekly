@@ -143,6 +143,21 @@
       margin-bottom: 4px;
     }
     .btn-create:hover { background: #eef4fd; }
+    .btn-sort {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 12px;
+      background: white;
+      border: 1px solid #e9e9e7;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #787774;
+      cursor: pointer;
+      font-family: inherit;
+      margin-bottom: 4px;
+    }
+    .btn-sort:hover { background: #f7f6f5; color: #37352f; }
 
     /* ── Table ── */
     .meeting-table {
@@ -1239,6 +1254,17 @@ function makeWeek(week) {
   const spacer = document.createElement('div');
   spacer.className = 'tabs-spacer';
   tabsBar.appendChild(spacer);
+  const sortBtn = document.createElement('button');
+  sortBtn.className = 'btn-sort';
+  sortBtn.textContent = '↕ 정렬';
+  sortBtn.title = '상태 기준 정렬 (예정 → 진행중 → 대기 → 완료)';
+  sortBtn.onclick = () => {
+    const order = { '예정': 0, '진행중': 1, '대기': 2, '완료': 3 };
+    week.projects.sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
+    save(); render();
+  };
+  tabsBar.appendChild(sortBtn);
+
   const createBtn = document.createElement('button');
   createBtn.className = 'btn-create';
   createBtn.textContent = '+ 새로 만들기';
@@ -1885,7 +1911,7 @@ function confirmAddProject(weekId, btn) {
   const status = modal.querySelector('#newProjStatus').value;
   const members = modal.querySelector('.modal-box')._getMembers?.() || [];
   const week = appData.weeks.find(w => w.id === weekId);
-  week.projects.push({ id:'p'+Date.now(), cat, name, members, status, goal:'', issue:'', detail:'' });
+  week.projects.unshift({ id:'p'+Date.now(), cat, name, members, status, goal:'', issue:'', detail:'' });
   save();
   document.querySelector('.member-picker')?.remove();
   modal.remove();
