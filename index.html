@@ -1,0 +1,1942 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>주간 회의록</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #fff;
+      color: #37352f;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .page {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 60px 96px 120px;
+    }
+
+    .page-title {
+      font-size: 40px;
+      font-weight: 700;
+      color: #37352f;
+      margin-bottom: 32px;
+      letter-spacing: -0.5px;
+    }
+
+    /* ── Week Section ── */
+    .week-section { margin-bottom: 2px; }
+
+    .week-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 6px;
+      cursor: pointer;
+      user-select: none;
+      font-weight: 500;
+      font-size: 14px;
+      border-radius: 4px;
+      color: #37352f;
+    }
+    .week-header:hover { background: #f1f0ef; }
+
+    .week-toggle {
+      font-size: 10px;
+      color: #9b9a97;
+      transition: transform 0.15s;
+      width: 14px;
+      display: inline-block;
+      text-align: center;
+    }
+    .week-section.collapsed .week-toggle { transform: rotate(-90deg); }
+    .week-section.collapsed .week-content { display: none; }
+
+    .week-content { padding: 8px 0 20px 20px; }
+
+    /* ── Notes ── */
+    .week-notes { margin-bottom: 18px; }
+    .notes-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 20px; }
+    .notes-area {
+      background: #f7f6f5;
+      border-radius: 6px;
+      padding: 8px 14px;
+      min-height: 36px;
+    }
+    .notes-edit-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 1px 0;
+    }
+    .notes-bullet { color: #9b9a97; flex-shrink: 0; line-height: 1.6; font-size: 14px; }
+    .notes-editable {
+      flex: 1;
+      outline: none;
+      font-size: 14px;
+      color: #37352f;
+      line-height: 1.6;
+      min-height: 22px;
+      word-break: break-all;
+    }
+    .notes-editable:empty::before { content: '메모를 입력하세요...'; color: #c4c2be; pointer-events: none; }
+    .notes-add-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 2px 0;
+      cursor: text;
+      color: #c4c2be;
+      font-size: 14px;
+    }
+    .notes-add-row:hover { color: #9b9a97; }
+
+    /* ── Tabs Bar ── */
+    .tabs-bar {
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid #e9e9e7;
+      margin-bottom: 0;
+      padding-bottom: 0;
+      gap: 2px;
+    }
+    .tab-btn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 8px 10px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: 13px;
+      color: #787774;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      font-family: inherit;
+      border-radius: 4px 4px 0 0;
+      white-space: nowrap;
+    }
+    .tab-btn.active { color: #37352f; border-bottom-color: #37352f; font-weight: 500; }
+    .tab-btn:hover:not(.active) { background: #f7f6f5; color: #37352f; }
+    .tabs-spacer { flex: 1; }
+    .btn-create {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 12px;
+      background: transparent;
+      color: #2383e2;
+      border: 1.5px solid #2383e2;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      margin-bottom: 4px;
+    }
+    .btn-create:hover { background: #eef4fd; }
+
+    /* ── Table ── */
+    .meeting-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      table-layout: auto;
+    }
+    .meeting-table th {
+      text-align: left;
+      padding: 8px 10px;
+      color: #9b9a97;
+      font-weight: 500;
+      font-size: 12px;
+      border-bottom: 1px solid #e9e9e7;
+      white-space: nowrap;
+    }
+    .meeting-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #f1f0ef;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    .meeting-table tr:hover td { background: #f7f6f5; }
+    .week-title {
+      cursor: pointer;
+      border-radius: 3px;
+      padding: 1px 3px;
+    }
+    .week-title:hover { background: #e9e9e7; }
+    .week-title[contenteditable="true"] {
+      outline: none;
+      background: white;
+      box-shadow: 0 0 0 2px #2383e2;
+      padding: 1px 4px;
+      cursor: text;
+    }
+
+    /* ── Category Badge ── */
+    .cat-badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .cat-운영 { background: #d3f8d3; color: #1a6b1a; }
+    .cat-구축 { background: #cfe0ff; color: #1a3fa3; }
+    .cat-제안 { background: #fdecc8; color: #8a5200; }
+    .cat-내부 { background: #e8d5ff; color: #6b2fa0; }
+
+    /* ── Status ── */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      white-space: nowrap;
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+    .status-badge:hover { background: #f1f0ef; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .s-예정 .status-dot { background: #f5c842; }
+    .s-진행중 .status-dot { background: #2383e2; }
+    .s-완료 .status-dot { background: #4caf50; }
+    .s-대기 .status-dot { background: #b3b3b3; }
+
+    /* ── Project Name ── */
+    .proj-name-wrap {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+    }
+    .proj-name-wrap:hover .proj-name { text-decoration: underline; }
+    .proj-icon { color: #9b9a97; font-size: 13px; flex-shrink: 0; }
+
+    /* ── Drag handle ── */
+    .drag-handle {
+      cursor: grab;
+      color: #c4c2be;
+      font-size: 13px;
+      padding: 0 4px;
+      user-select: none;
+      line-height: 1;
+    }
+    .drag-handle:hover { color: #9b9a97; }
+    .drag-handle:active { cursor: grabbing; }
+    tr.drag-over { outline: 2px solid #0066ff55; outline-offset: -2px; background: #f0f4ff; }
+    .proj-name {
+      color: #37352f;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+    .proj-name-wrap { overflow: hidden; }
+
+    /* ── Avatars ── */
+    .avatars-wrap { display: flex; align-items: center; }
+    .avatar-wrap {
+      position: relative;
+      margin-right: -5px;
+      flex-shrink: 0;
+    }
+    .avatar-wrap:last-of-type { margin-right: 0; }
+    .avatar {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      color: white;
+      border: 1.5px solid white;
+      cursor: default;
+    }
+    .avatar-tooltip {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #37352f;
+      color: white;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 10px;
+      border-radius: 6px;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    .avatar-tooltip::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 5px solid transparent;
+      border-top-color: #37352f;
+    }
+    .avatar-wrap:hover .avatar-tooltip { opacity: 1; }
+    .avatar-extra {
+      font-size: 11px;
+      color: #9b9a97;
+      margin-left: 10px;
+      white-space: nowrap;
+    }
+
+    /* ── Table cell input (직접 편집) ── */
+    .cell-wrap {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      min-width: 180px;
+      max-width: 200px;
+      position: relative;
+    }
+    .cell-input {
+      flex: 1;
+      border: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 13px;
+      color: #37352f;
+      outline: none;
+      width: 100%;
+      min-width: 0;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      overflow: hidden;
+      padding: 2px 4px;
+      border-radius: 3px;
+      cursor: default;
+    }
+    .cell-input::placeholder { color: #c4c2be; }
+    .cell-input:hover { background: #f1f0ef; cursor: text; }
+    .cell-input:focus { background: #f7f6f5; cursor: text; text-overflow: clip; }
+
+    /* ── Text edit popup ── */
+    .text-edit-popup {
+      position: fixed;
+      background: white;
+      border: 1px solid #e9e9e7;
+      border-radius: 8px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+      padding: 10px;
+      z-index: 2000;
+      min-width: 260px;
+      max-width: 380px;
+    }
+    .text-edit-popup textarea {
+      width: 100%;
+      min-height: 72px;
+      border: none;
+      outline: none;
+      resize: none;
+      font-family: inherit;
+      font-size: 14px;
+      color: #37352f;
+      line-height: 1.6;
+      background: transparent;
+    }
+
+    /* ── Add row button ── */
+    .add-row-btn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 10px;
+      color: #9b9a97;
+      font-size: 13px;
+      cursor: pointer;
+      background: none;
+      border: none;
+      font-family: inherit;
+      border-radius: 4px;
+      margin-top: 2px;
+    }
+    .add-row-btn:hover { background: #f7f6f5; color: #37352f; }
+
+    /* ── Detail Panel ── */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 15, 15, 0.3);
+      z-index: 200;
+      display: none;
+    }
+    .overlay.open { display: block; }
+
+    .detail-panel {
+      position: fixed;
+      top: 0; right: 0;
+      width: 52%;
+      max-width: 760px;
+      min-width: 480px;
+      height: 100vh;
+      background: white;
+      box-shadow: -4px 0 24px rgba(0,0,0,0.12);
+      z-index: 201;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
+    }
+    .detail-panel.open { transform: translateX(0); }
+
+    .dp-header {
+      padding: 28px 32px 16px;
+      border-bottom: 1px solid #e9e9e7;
+      flex-shrink: 0;
+    }
+    .dp-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .dp-meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #9b9a97; }
+    .dp-close {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 18px;
+      color: #9b9a97;
+      padding: 4px 8px;
+      border-radius: 4px;
+      line-height: 1;
+    }
+    .dp-close:hover { background: #f7f6f5; color: #37352f; }
+    .dp-title {
+      font-size: 26px;
+      font-weight: 700;
+      color: #37352f;
+      outline: none;
+      line-height: 1.3;
+      border-radius: 4px;
+      padding: 2px 6px;
+      margin-left: -6px;
+      cursor: text;
+      transition: background 0.15s;
+    }
+    .dp-title:hover { background: #f7f6f5; }
+    .dp-title:focus { background: #f0efee; box-shadow: 0 0 0 2px #0066ff33; }
+
+    .dp-body { flex: 1; padding: 20px 32px; overflow-y: auto; }
+    .dp-editor {
+      width: 100%;
+      height: 100%;
+      min-height: 300px;
+      border: none;
+      outline: none;
+      font-family: inherit;
+      font-size: 14px;
+      line-height: 1.75;
+      color: #37352f;
+      resize: none;
+    }
+    .dp-editor::placeholder { color: #c4c2be; }
+
+    /* ── New week modal ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15,15,15,0.4);
+      z-index: 300;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-box {
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      width: 400px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+    }
+    .modal-title { font-weight: 600; font-size: 16px; margin-bottom: 12px; }
+    .modal-input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #e9e9e7;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 14px;
+      outline: none;
+      margin-bottom: 16px;
+    }
+    .modal-input:focus { border-color: #2383e2; box-shadow: 0 0 0 2px rgba(35,131,226,0.2); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    .modal-cancel {
+      padding: 7px 14px; border: 1px solid #e9e9e7; background: white;
+      border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 13px;
+    }
+    .modal-cancel:hover { background: #f7f6f5; }
+    .modal-confirm {
+      padding: 7px 14px; background: #2383e2; color: white; border: none;
+      border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 500;
+    }
+    .modal-confirm:hover { background: #1a6dbf; }
+
+    /* ── Title row ── */
+    .page-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 32px;
+    }
+    .page-title-row .page-title { margin-bottom: 0; }
+    .add-week-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 16px; color: white; font-size: 13px; font-weight: 500;
+      cursor: pointer; background: #2383e2; border: none;
+      font-family: inherit; border-radius: 6px; white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .add-week-btn:hover { background: #1a6dbf; }
+
+    /* ── Week delete button ── */
+    .week-del-btn {
+      margin-left: auto;
+      background: none; border: none; cursor: pointer;
+      color: #c7c6c4; font-size: 14px; padding: 2px 6px;
+      border-radius: 4px; opacity: 0; transition: opacity 0.1s;
+      flex-shrink: 0;
+    }
+    .week-header:hover .week-del-btn { opacity: 1; }
+    .week-del-btn:hover { background: #fee2e2; color: #dc2626; }
+
+    /* ── Row delete button ── */
+    .row-del-btn {
+      background: none; border: none; cursor: pointer;
+      color: #c7c6c4; font-size: 13px; padding: 2px 6px;
+      border-radius: 4px; opacity: 0; transition: opacity 0.1s;
+      white-space: nowrap;
+    }
+    .meeting-table tr:hover .row-del-btn { opacity: 1; }
+    .row-del-btn:hover { background: #fee2e2; color: #dc2626; }
+
+    /* ── Kanban Board ── */
+    .kanban-board {
+      display: flex;
+      gap: 14px;
+      padding: 16px 0 8px;
+      overflow-x: auto;
+      align-items: flex-start;
+    }
+    .kanban-col {
+      min-width: 258px;
+      width: 258px;
+      border-radius: 10px;
+      padding: 12px;
+      flex-shrink: 0;
+    }
+    .kanban-col-hdr {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      font-weight: 600;
+      font-size: 13px;
+      color: #37352f;
+    }
+    .kanban-col-count { color: #9b9a97; font-weight: 400; font-size: 13px; }
+    .kanban-card {
+      background: white;
+      border: 1px solid #e9e9e7;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: box-shadow 0.15s;
+    }
+    .kanban-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.09); }
+    .kanban-card-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: #37352f;
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      margin-bottom: 8px;
+      line-height: 1.4;
+      word-break: keep-all;
+    }
+    .kanban-chip-row { display: flex; flex-wrap: wrap; gap: 4px 8px; margin-bottom: 6px; }
+    .kanban-chip { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #37352f; }
+    .kanban-chip .avatar { width: 18px; height: 18px; font-size: 9px; border: none; margin-right: 0; flex-shrink: 0; }
+    .kanban-card-goal { font-size: 12px; color: #6b6b6b; margin-top: 4px; line-height: 1.5; }
+    .kanban-card-status { margin-top: 8px; }
+    .kanban-add-btn {
+      display: flex; align-items: center; gap: 5px;
+      color: #9b9a97; font-size: 13px; cursor: pointer;
+      padding: 6px 4px; border-radius: 4px;
+      background: none; border: none; width: 100%;
+      font-family: inherit; margin-top: 2px;
+    }
+    .kanban-add-btn:hover { background: rgba(0,0,0,0.04); color: #37352f; }
+
+    /* ── Member Picker ── */
+    .member-picker {
+      position: fixed;
+      background: white;
+      border: 1px solid #e9e9e7;
+      border-radius: 10px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.18);
+      z-index: 400;
+      width: 420px;
+      overflow: hidden;
+    }
+    .mp-input-area {
+      display: flex; flex-wrap: wrap; align-items: center;
+      gap: 6px; padding: 10px 12px;
+      border-bottom: 1px solid #f1f0ef; min-height: 46px;
+      cursor: text;
+    }
+    .mp-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: #f1f0ef; border-radius: 4px;
+      padding: 3px 6px 3px 4px; font-size: 12px; flex-shrink: 0;
+    }
+    .mp-chip-del {
+      background: none; border: none; cursor: pointer;
+      color: #9b9a97; font-size: 15px; line-height: 1; padding: 0; margin-left: 2px;
+    }
+    .mp-chip-del:hover { color: #37352f; }
+    .mp-search {
+      border: none; outline: none; font-family: inherit;
+      font-size: 13px; min-width: 60px; width: 60px; flex: 1; max-width: 140px;
+      background: transparent; padding: 2px 0;
+    }
+    .mp-hint { padding: 8px 12px 4px; font-size: 11px; color: #9b9a97; }
+    .mp-list { max-height: 220px; overflow-y: auto; padding: 4px 0 6px; }
+    .mp-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 7px 12px; cursor: pointer; font-size: 13px;
+    }
+    .mp-item:hover { background: #f7f6f5; }
+    .mp-check { margin-left: auto; color: #2383e2; font-weight: 700; font-size: 14px; }
+    .modal-member-trigger {
+      padding: 7px 12px; border: 1px solid #e9e9e7; border-radius: 6px;
+      cursor: pointer; min-height: 38px; display: flex; align-items: center;
+      flex-wrap: wrap; gap: 4px;
+    }
+    .modal-member-trigger:hover { border-color: #b3b3b3; }
+    .td-members-wrap { display: flex; align-items: center; cursor: pointer; }
+    .td-members-add { color: #c4c2be; font-size: 12px; }
+    td:has(.td-members-wrap):hover .td-members-add { color: #9b9a97; }
+
+    /* Member kanban */
+    .kanban-col-member { background: transparent; min-width: 220px; width: 220px; }
+    .kanban-avatar-lg {
+      width: 30px; height: 30px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; color: white; flex-shrink: 0;
+    }
+    .kanban-member-item {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 10px; font-size: 13px; color: #37352f;
+      background: white; border: 1px solid #e9e9e7;
+      border-radius: 6px; margin-bottom: 6px; cursor: pointer;
+    }
+    .kanban-member-item:hover { background: #f7f6f5; }
+    .kanban-member-icon { color: #9b9a97; flex-shrink: 0; }
+
+    @media (max-width: 900px) {
+      .page { padding: 40px 24px 80px; }
+      .detail-panel { width: 90%; min-width: unset; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- 로딩 화면 -->
+<div id="loadingScreen" style="position:fixed;inset:0;background:white;z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
+  <div style="font-size:32px">📋</div>
+  <div style="font-size:16px;color:#9b9a97;font-family:'Noto Sans KR',sans-serif">데이터 불러오는 중...</div>
+</div>
+
+<div class="page">
+  <div class="page-title-row">
+    <h1 class="page-title">주간 회의록</h1>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button id="importHistBtn" onclick="importHistoricalData()" style="padding:6px 12px;border:1px solid #9b9a97;background:white;color:#787774;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit">📥 히스토리 추가</button>
+      <button id="resetBtn" onclick="resetData()" style="display:none;padding:6px 12px;border:1px solid #e74c3c;background:white;color:#e74c3c;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit">↺ 데이터 초기화</button>
+      <button class="add-week-btn" onclick="showAddWeek()">+ 이번주 생성</button>
+    </div>
+  </div>
+  <div id="weeksContainer"></div>
+</div>
+
+<!-- Overlay & Detail Panel -->
+<div class="overlay" id="overlay" onclick="closeDetail()"></div>
+<div class="detail-panel" id="detailPanel">
+  <div class="dp-header">
+    <div class="dp-top-row">
+      <div class="dp-meta" id="dpMeta"></div>
+      <button class="dp-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div class="dp-title" id="dpTitle"></div>
+  </div>
+  <div class="dp-body">
+    <textarea class="dp-editor" id="dpEditor" placeholder="내용을 자유롭게 작성하세요...&#10;&#10;예) 진행 상황, 이슈 상세, 다음 액션 아이템 등"></textarea>
+  </div>
+</div>
+
+<script>
+// ────────────────────────────────────────────────
+//  MEMBER COLORS
+// ────────────────────────────────────────────────
+const MEMBER_COLORS = {
+  '오승언': '#8b9dc3',
+  '구슬이': '#4caf50',
+  '김승희': '#9e9e9e',
+  '김나연': '#e67e22',
+  '남가현': '#e74c3c',
+  '이지현': '#3498db',
+  '박민승': '#78909c',
+};
+const ALL_MEMBERS = ['오승언', '구슬이', '김승희', '김나연', '남가현', '이지현', '박민승'];
+function memberColor(name) { return MEMBER_COLORS[name] || '#aaa'; }
+function initials(name) { return name.slice(0, 1); }
+
+// ────────────────────────────────────────────────
+//  DEFAULT DATA
+// ────────────────────────────────────────────────
+const DEFAULT_DATA = {
+  weeks: [
+    {
+      id: 'w2026-06-4',
+      title: '2026년 6월 4주차',
+      expanded: true,
+      notes: ['내일 독서 리뷰 목요일 제안', '10시 출근, 회식 장소 셀렉'],
+      projects: [
+        { id:'p1',  cat:'운영', name:'유한킴벌리: 마이비데 쇼츠 영상',        members:['오승언'],                                      status:'예정',  goal:'',                                      issue:'' , detail:'' },
+        { id:'p2',  cat:'구축', name:'유한킴벌리 헬스케어 영상',               members:['오승언','구슬이'],                              status:'진행중', goal:'스트리보드 내용 이미지 작업',            issue:'법무 이슈 등으로 전체 일정 재조율 예정', detail:'' },
+        { id:'p3',  cat:'제안', name:'하겐다즈 운영 제안',                     members:['구슬이','김승희','김나연','남가현','이지현','박민승'], status:'진행중', goal:'🌟 프로젝트 파일에 기재',               issue:'' , detail:'' },
+        { id:'p4',  cat:'운영', name:'LG 구겐하임',                            members:['김나연'],                                      status:'진행중', goal:'대기중',                                issue:'현행화 + FAQ 수정 필요', detail:'' },
+        { id:'p5',  cat:'구축', name:'스누지니 개편',                          members:['구슬이','박민승'],                              status:'진행중', goal:'수정 대응',                              issue:'이슈없음', detail:'' },
+        { id:'p6',  cat:'구축', name:'암웨이 온라인 점수',                     members:['이지현','구슬이'],                              status:'진행중', goal:'이번주 산출물 전달 예정',                issue:'-', detail:'' },
+        { id:'p7',  cat:'구축', name:'LG 글로벌 바잉가이드',                   members:['구슬이'],                                      status:'진행중', goal:'-',                                    issue:'이슈없음', detail:'' },
+        { id:'p8',  cat:'운영', name:'LG IT',                                  members:['이지현','김나연','남가현','김승희','오승언'],    status:'진행중', goal:'🌟 프로젝트 파일에 기재',               issue:'' , detail:'' },
+        { id:'p9',  cat:'내부', name:'ONA 웹사이트',                           members:['구슬이','김승희','김나연','남가현'],             status:'진행중', goal:'포폴 대표 영상 / 일부 포폴 수정',       issue:'-', detail:'' },
+        { id:'p10', cat:'내부', name:'ONA 마니또',                             members:['김나연','남가현'],                              status:'진행중', goal:'전체 메일 공지 예정',                    issue:'최종 정리 필요', detail:'' },
+        { id:'p11', cat:'구축', name:'메디쏠라',                               members:['김승희','김나연','구슬이'],                     status:'진행중', goal:'-',                                    issue:'-', detail:'' },
+        { id:'p12', cat:'운영', name:'유한킴벌리: 치약 PDP 베리에이션',        members:['박민승'],                                      status:'진행중', goal:'-',                                    issue:'담당자 부재로 23일 이후 컨펌 예정', detail:'' },
+        { id:'p13', cat:'운영', name:'유한킴벌리: 캡슐세제 PDP 신규 X',        members:['박민승'],                                      status:'진행중', goal:'-',                                    issue:'24(수) 1차 시안 전달 예정', detail:'' },
+        { id:'p14', cat:'운영', name:'포스텔',                                 members:['김승희'],                                      status:'진행중', goal:'인터널 메인 KV 인터널 메인 배너 → 기획', issue:'-', detail:'' },
+        { id:'p15', cat:'구축', name:'인포벨',                                 members:['오승언'],                                      status:'진행중', goal:'시상식 영상작업, 금요일 마무리, 40P',    issue:'-', detail:'' },
+        { id:'p16', cat:'운영', name:'풀무원',                                 members:['남가현'],                                      status:'대기',  goal:'-',                                    issue:'-', detail:'' },
+        { id:'p17', cat:'운영', name:'플레이디',                               members:['김승희'],                                      status:'대기',  goal:'-',                                    issue:'-', detail:'' },
+        { id:'p18', cat:'운영', name:'헥토 사내 APP 운영 및 스테이블',          members:[],                                              status:'대기',  goal:'-',                                    issue:'-', detail:'' },
+        { id:'p19', cat:'내부', name:'ONA 휴가시스템',                         members:[],                                              status:'대기',  goal:'-',                                    issue:'앱아이콘 / 로그인 디벨롭 필요', detail:'' },
+        { id:'p20', cat:'내부', name:'ONA 회사소개서',                         members:[],                                              status:'대기',  goal:'-',                                    issue:'템플릿 재정리 필요', detail:'' },
+        { id:'p21', cat:'내부', name:'ONA 회의록',                             members:[],                                              status:'대기',  goal:'-',                                    issue:'-', detail:'' },
+      ]
+    },
+    {
+      id:'w2026-06-3', title:'2026년 6월 3주차', expanded:false,
+      notes:['업무 현황 맨 밑에 \'기타\' 추가 → AI 테스트, 리더, 독서, 주간 등을 추가하자'],
+      projects:[
+        { id:'h3p1',  cat:'운영', name:'LG 구겐하임',                        members:['김나연'],                                                 status:'예정',   goal:'-',                                      issue:'컨텐츠 추가 예정',                        detail:'' },
+        { id:'h3p2',  cat:'구축', name:'유한킴벌리 헬스케어 영상',             members:['오승언','구슬이'],                                         status:'예정',   goal:'',                                       issue:'법무 이슈 등으로 전체 일정 재조율 예정',   detail:'' },
+        { id:'h3p3',  cat:'운영', name:'유한킴벌리: 마이비데 쇼츠 영상',       members:['오승언'],                                                 status:'예정',   goal:'',                                       issue:'',                                        detail:'' },
+        { id:'h3p4',  cat:'구축', name:'스누지니 개편',                        members:['구슬이','박민승'],                                         status:'진행중', goal:'임직원 & 교수 / 피드백 반영 전달',         issue:'',                                        detail:'' },
+        { id:'h3p5',  cat:'구축', name:'암웨이 온라인 접수',                   members:['이지현','구슬이'],                                         status:'진행중', goal:'-',                                      issue:'',                                        detail:'' },
+        { id:'h3p6',  cat:'구축', name:'LG 글로벌 바잉가이드',                 members:['구슬이'],                                                 status:'진행중', goal:'-',                                      issue:'이슈없음',                                 detail:'' },
+        { id:'h3p7',  cat:'운영', name:'LG IT',                               members:['이지현','김나연','남가현','김승희','오승언','박민승'],         status:'진행중', goal:'🌟 프로젝트 파일에 기재',                  issue:'',                                        detail:'' },
+        { id:'h3p8',  cat:'내부', name:'ONA 웹사이트',                         members:['구슬이','김승희','김나연','남가현'],                         status:'진행중', goal:'포폴 대표 영상 셀렉 / 일부 포폴 수정',     issue:'-',                                       detail:'' },
+        { id:'h3p9',  cat:'내부', name:'ONA 마니또',                           members:['김나연','남가현'],                                         status:'진행중', goal:'ㅎㅎ',                                   issue:'',                                        detail:'' },
+        { id:'h3p10', cat:'구축', name:'메디쏠라',                             members:['김승희','김나연','구슬이'],                                 status:'진행중', goal:'다양한 방법(AI 포함)으로 벤치마킹',          issue:'-',                                       detail:'' },
+        { id:'h3p11', cat:'운영', name:'유한킴벌리: 치약 PDP 베리에이션',       members:['박민승'],                                                 status:'진행중', goal:'',                                       issue:'담당자 부재로 23일 이후 컨펌 예정',          detail:'' },
+        { id:'h3p12', cat:'운영', name:'유한킴벌리: 캡슐세제 PDP 신규 X',      members:['박민승'],                                                 status:'진행중', goal:'',                                       issue:'김승희 메디쏠라 투입 → 담당자 변경',        detail:'' },
+        { id:'h3p13', cat:'운영', name:'포스텔',                               members:['김승희'],                                                 status:'대기',   goal:'인터널 메인 KV 인터널 메인 배너 → 기획',     issue:'-',                                       detail:'' },
+        { id:'h3p14', cat:'운영', name:'풀무원',                               members:['남가현'],                                                 status:'대기',   goal:'-',                                      issue:'-',                                       detail:'' },
+        { id:'h3p15', cat:'운영', name:'플레이디',                             members:['김승희'],                                                 status:'대기',   goal:'-',                                      issue:'-',                                       detail:'' },
+        { id:'h3p16', cat:'운영', name:'헥토 사내 APP 운영 및 스테이블',        members:[],                                                         status:'대기',   goal:'-',                                      issue:'-',                                       detail:'' },
+        { id:'h3p17', cat:'내부', name:'ONA 휴가시스템',                       members:[],                                                         status:'대기',   goal:'-',                                      issue:'앱아이콘 / 로그인 디벨롭 필요',              detail:'' },
+        { id:'h3p18', cat:'내부', name:'ONA 회사소개서',                       members:[],                                                         status:'대기',   goal:'-',                                      issue:'템플릿 재정리 필요',                         detail:'' },
+        { id:'h3p19', cat:'내부', name:'ONA 회의록',                           members:[],                                                         status:'대기',   goal:'-',                                      issue:'-',                                       detail:'' },
+      ]
+    },
+    {
+      id:'w2026-06-2', title:'2026년 6월 2주차', expanded:false,
+      notes:['리스트'],
+      projects:[
+        { id:'h2p1',  cat:'운영', name:'LG 구겐하임',                          members:['김나연'],                                                 status:'예정',   goal:'-',                                      issue:'인용구 컨텐츠 추가',                        detail:'' },
+        { id:'h2p2',  cat:'구축', name:'스누지니 개편',                         members:['구슬이','박민승'],                                         status:'진행중', goal:'피드백 반영 / 임직원&교수 검수 후 전달',     issue:'',                                        detail:'' },
+        { id:'h2p3',  cat:'구축', name:'암웨이 온라인 접수',                    members:['이지현','구슬이'],                                         status:'진행중', goal:'전체 페이지 완료, 팝업 이미지 수급 대기',     issue:'-',                                       detail:'' },
+        { id:'h2p4',  cat:'구축', name:'LG 글로벌 바잉가이드',                  members:['구슬이'],                                                 status:'진행중', goal:'아이콘 및 이미지 제작 요청 대응',             issue:'-',                                       detail:'' },
+        { id:'h2p5',  cat:'운영', name:'LG IT',                                members:['이지현','김나연','남가현','김승희','오승언'],                 status:'진행중', goal:'🌟 프로젝트 파일에 기재',                  issue:'',                                        detail:'' },
+        { id:'h2p6',  cat:'내부', name:'ONA 웹사이트',                          members:['구슬이','김승희'],                                         status:'진행중', goal:'블로그 이미지 제작 / 영상 수정',             issue:'-',                                       detail:'' },
+        { id:'h2p7',  cat:'내부', name:'ONA 마니또',                            members:['김나연','남가현'],                                         status:'진행중', goal:'-',                                      issue:'스터디 내용 정리 → 블로그 업로드용',          detail:'' },
+        { id:'h2p8',  cat:'운영', name:'포스텔',                                members:['김승희'],                                                 status:'대기',   goal:'시설 이미지 수급 대기중',                     issue:'-',                                       detail:'' },
+        { id:'h2p9',  cat:'구축', name:'유한킴벌리 헬스케어 영상',               members:['오승언','구슬이'],                                         status:'대기',   goal:'',                                       issue:'기획 전달 - 법인 피드백 대기중',              detail:'' },
+        { id:'h2p10', cat:'구축', name:'메디쏠라 개편',                         members:['김승희','김나연'],                                         status:'대기',   goal:'-',                                      issue:'-',                                       detail:'' },
+        { id:'h2p11', cat:'운영', name:'유한킴벌리',                            members:['박민승','오승언'],                                         status:'대기',   goal:'🌟 프로젝트 파일에 기재',                  issue:'신규 PDP 작업 담당자 필요',                  detail:'' },
+        { id:'h2p12', cat:'운영', name:'풀무원',                                members:['남가현'],                                                 status:'대기',   goal:'-',                                      issue:'-',                                       detail:'' },
+        { id:'h2p13', cat:'운영', name:'플레이디',                              members:['김승희'],                                                 status:'대기',   goal:'-',                                      issue:'-',                                       detail:'' },
+        { id:'h2p14', cat:'운영', name:'헥토 사내 APP 운영 및 스테이블',         members:[],                                                         status:'대기',   goal:'',                                       issue:'',                                        detail:'' },
+        { id:'h2p15', cat:'내부', name:'ONA 휴가시스템',                        members:[],                                                         status:'대기',   goal:'-',                                      issue:'로그인 디벨롭 필요',                         detail:'' },
+        { id:'h2p16', cat:'내부', name:'ONA 회사소개서',                        members:[],                                                         status:'대기',   goal:'-',                                      issue:'템플릿 재정리 필요',                         detail:'' },
+        { id:'h2p17', cat:'내부', name:'ONA 회의록',                            members:[],                                                         status:'대기',   goal:'-',                                      issue:'-',                                       detail:'' },
+      ]
+    },
+    {
+      id:'w2026-06-1', title:'2026년 6월 1주차', expanded:false,
+      notes:['회의 시간 11:20을 디폴트로 / 외근 및 실장님 참여시 유동적으로 11시 회의시작'],
+      projects:[
+        { id:'h1p1',  cat:'운영', name:'LG 구겐하임',                          members:['김나연'],                                                 status:'예정',   goal:'-',                                      issue:'인용구 컨텐츠 추가',                        detail:'' },
+        { id:'h1p2',  cat:'구축', name:'스누지니 개편',                         members:['구슬이','박민승'],                                         status:'진행중', goal:'피드백 반영 / 다크모드 / 임직원 교수',       issue:'지난주 IT 지원 업무로 이번주에 수행',         detail:'' },
+        { id:'h1p3',  cat:'구축', name:'암웨이 온라인 접수',                    members:['이지현','구슬이'],                                         status:'진행중', goal:'6월 2일 PC/MO 전체 페이지 전달',             issue:'-',                                       detail:'' },
+        { id:'h1p4',  cat:'구축', name:'LG 글로벌 바잉가이드',                  members:['구슬이'],                                                 status:'진행중', goal:'-',                                      issue:'매주 아이콘 및 이미지 제작 요청',             detail:'' },
+        { id:'h1p5',  cat:'운영', name:'LG IT',                                members:['이지현','김나연','남가현','김승희','오승언'],                 status:'진행중', goal:'🌟 프로젝트 파일에 기재',                  issue:'스펙 수급 및 내용 변경 등으로 인해 패키지',   detail:'' },
+        { id:'h1p6',  cat:'내부', name:'ONA 웹사이트',                          members:['구슬이','김승희'],                                         status:'진행중', goal:'어바웃(화) / 메디쏠라 포폴(-) / 인트로 영상', issue:'-',                                       detail:'' },
+        { id:'h1p7',  cat:'운영', name:'포스텔',                                members:['김승희'],                                                 status:'진행중', goal:'이번주 에셋 수급 예정 → 수급 후 워킹데이',   issue:'-',                                       detail:'' },
+        { id:'h1p8',  cat:'내부', name:'ONA 마니또',                            members:['김나연','남가현'],                                         status:'진행중', goal:'-',                                      issue:'스터디 내용 정리 → 블로그 업로드용',          detail:'' },
+        { id:'h1p9',  cat:'구축', name:'유한킴벌리 헬스케어 영상',               members:['오승언','구슬이'],                                         status:'대기',   goal:'',                                       issue:'기획 전달 - 법인 피드백 대기중',              detail:'' },
+        { id:'h1p10', cat:'구축', name:'메디쏠라 개편',                         members:['김승희','김나연'],                                         status:'대기',   goal:'-',                                      issue:'-',                                       detail:'' },
+        { id:'h1p11', cat:'운영', name:'유한킴벌리',                            members:['박민승','오승언'],                                         status:'대기',   goal:'🌟 프로젝트 파일에 기재',                  issue:'신규 PDP 작업 담당자 필요',                  detail:'' },
+        { id:'h1p12', cat:'운영', name:'풀무원',                                members:['남가현'],                                                 status:'대기',   goal:'-',                                      issue:'-',                                       detail:'' },
+        { id:'h1p13', cat:'운영', name:'플레이디',                              members:['김승희'],                                                 status:'대기',   goal:'',                                       issue:'-',                                       detail:'' },
+        { id:'h1p14', cat:'운영', name:'헥토 사내 APP 운영 및 스테이블',         members:[],                                                         status:'대기',   goal:'',                                       issue:'',                                        detail:'' },
+        { id:'h1p15', cat:'내부', name:'ONA 휴가시스템',                        members:[],                                                         status:'대기',   goal:'-',                                      issue:'로그인 디벨롭 필요',                         detail:'' },
+        { id:'h1p16', cat:'내부', name:'ONA 회사소개서',                        members:[],                                                         status:'대기',   goal:'-',                                      issue:'템플릿 재정리 필요',                         detail:'' },
+        { id:'h1p17', cat:'내부', name:'ONA 회의록',                            members:[],                                                         status:'대기',   goal:'-',                                      issue:'-',                                       detail:'' },
+      ]
+    },
+    { id:'w2026-05-4', title:'2026년 5월 4주차', expanded:false, notes:[], projects:[] },
+    { id:'w2026-05-3', title:'2026년 5월 3주차', expanded:false, notes:[], projects:[] },
+    { id:'w2026-05-2', title:'2026년 5월 2주차', expanded:false, notes:[], projects:[] },
+    { id:'w2026-05-1', title:'2026년 5월 1주차', expanded:false, notes:[], projects:[] },
+    { id:'w2026-04-5', title:'2026년 4월 5주차', expanded:false, notes:[], projects:[] },
+    { id:'w2026-04-4', title:'2026년 4월 4주차', expanded:false, notes:[], projects:[] },
+    { id:'w2026-04-3', title:'2026년 4월 3주차', expanded:false, notes:[], projects:[] },
+    { id:'w2026-04-2', title:'2026년 4월 2주차', expanded:false, notes:[], projects:[] },
+    { id:'w2026-04-1', title:'2026년 4월 1주차', expanded:false, notes:[], projects:[] },
+    { id:'w2026-03-4', title:'2026년 3월 4주차', expanded:false, notes:[], projects:[] },
+    { id:'w2026-03-3', title:'2026년 3월 3주차', expanded:false, notes:[], projects:[] },
+    { id:'w2026-03-2', title:'2026년 3월 2주차', expanded:false, notes:[], projects:[] },
+  ]
+};
+
+// ────────────────────────────────────────────────
+//  FIREBASE 초기화
+// ────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyCxhiuN8yYOXhTXIIpcylZzhTMOI0zocP4",
+  authDomain: "ona-design-weekly.firebaseapp.com",
+  databaseURL: "https://ona-design-weekly-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "ona-design-weekly",
+  storageBucket: "ona-design-weekly.firebasestorage.app",
+  messagingSenderId: "972734348601",
+  appId: "1:972734348601:web:02b7748052ced2b929fce8",
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const dataRef = db.ref('weeklyMeeting');
+
+// ────────────────────────────────────────────────
+//  STATE
+// ────────────────────────────────────────────────
+let appData = { weeks: [] };
+let currentRef = null;
+const weekTabState = {};
+let saveTimer = null;
+let _initialized = false;
+
+// 저장 (500ms 디바운스)
+function save() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    dataRef.set(appData).catch(e => console.error('저장 실패:', e));
+  }, 500);
+}
+
+// Firebase 객체 → 배열 변환 (Firebase는 배열을 객체로 저장하고, 빈 배열은 null로 저장함)
+function fixArrays(data) {
+  if (!data) return data;
+  if (data.weeks && !Array.isArray(data.weeks)) {
+    data.weeks = Object.values(data.weeks);
+  }
+  if (data.weeks) {
+    data.weeks.forEach(w => {
+      // Firebase가 빈 배열을 null/undefined로 저장 → 빈 배열로 복구
+      if (!w.notes) w.notes = [];
+      if (!w.projects) w.projects = [];
+      if (!Array.isArray(w.notes)) w.notes = Object.values(w.notes);
+      if (!Array.isArray(w.projects)) w.projects = Object.values(w.projects);
+      w.projects.forEach(p => {
+        if (!p.members) p.members = [];
+        if (!Array.isArray(p.members)) p.members = Object.values(p.members);
+      });
+    });
+  }
+  return data;
+}
+
+// Firebase 응답 없을 때 5초 후 기본 데이터로 강제 로드
+const _fbTimeout = setTimeout(() => {
+  if (!_initialized) {
+    console.warn('Firebase 타임아웃 - 기본 데이터 사용');
+    appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
+    document.getElementById('loadingScreen').style.display = 'none';
+    _initialized = true;
+    render();
+    // 저장 재시도
+    dataRef.set(appData).catch(e => {
+      console.error('Firebase 저장 실패 (규칙 확인 필요):', e.code);
+      const banner = document.createElement('div');
+      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#e74c3c;color:white;text-align:center;padding:10px;font-size:13px;z-index:9999;font-family:inherit';
+      banner.innerHTML = '⚠️ Firebase 권한 오류 — Firebase 콘솔 → Realtime Database → 규칙에서 read/write를 <b>true</b>로 변경해주세요';
+      document.body.prepend(banner);
+    });
+  }
+}, 5000);
+
+// 실시간 동기화 — 다른 팀원이 수정하면 자동 반영
+dataRef.on('value', (snapshot) => {
+  clearTimeout(_fbTimeout);
+  const raw = snapshot.val();
+  const data = fixArrays(raw);
+  if (data && data.weeks && data.weeks.length > 0) {
+    appData = data;
+  } else {
+    // 첫 접속: 기본 데이터 업로드
+    appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
+    dataRef.set(appData).catch(e => console.error('Firebase 저장 실패:', e));
+  }
+  document.getElementById('loadingScreen').style.display = 'none';
+  _initialized = true;
+  try { render(); } catch(e) {
+    console.error('렌더링 오류:', e);
+    document.getElementById('resetBtn').style.display = 'block';
+    document.getElementById('weeksContainer').innerHTML =
+      `<div style="color:#e74c3c;padding:20px">오류가 발생했습니다. "데이터 초기화" 버튼을 눌러주세요.<br><small>${e.message}</small></div>`;
+  }
+}, (error) => {
+  clearTimeout(_fbTimeout);
+  console.error('Firebase 연결 오류:', error);
+  const ls = document.getElementById('loadingScreen');
+  ls.innerHTML = `<div style="text-align:center;font-family:inherit">
+    <div style="font-size:24px;margin-bottom:12px">⚠️</div>
+    <div style="font-size:15px;color:#e74c3c;margin-bottom:8px">Firebase 권한 오류</div>
+    <div style="font-size:13px;color:#787774">Firebase 콘솔 → Realtime Database → 규칙 탭에서<br>read/write를 <b>true</b>로 변경 후 게시해주세요</div>
+    <button onclick="location.reload()" style="margin-top:16px;padding:8px 16px;background:#0070f3;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px">새로고침</button>
+  </div>`;
+});
+
+// ────────────────────────────────────────────────
+//  RENDER
+// ────────────────────────────────────────────────
+function render() {
+  const container = document.getElementById('weeksContainer');
+  container.innerHTML = '';
+  if (!appData.weeks || appData.weeks.length === 0) {
+    document.getElementById('resetBtn').style.display = 'block';
+    container.innerHTML = '<div style="color:#9b9a97;padding:40px 0;font-size:14px">데이터가 없습니다. "데이터 초기화" 버튼을 눌러주세요.</div>';
+    return;
+  }
+  document.getElementById('resetBtn').style.display = 'none';
+  appData.weeks.forEach(w => container.appendChild(makeWeek(w)));
+}
+
+// ── 텍스트 팝업 편집기 ──
+function showTextPopup(anchorEl, initialText, onSave) {
+  const existing = document.getElementById('_textPopup');
+  if (existing) existing.remove();
+
+  const popup = document.createElement('div');
+  popup.id = '_textPopup';
+  popup.className = 'text-edit-popup';
+
+  const ta = document.createElement('textarea');
+  ta.value = initialText;
+  ta.placeholder = '내용 입력...';
+  popup.appendChild(ta);
+  document.body.appendChild(popup);
+
+  // 위치 계산
+  const rect = anchorEl.getBoundingClientRect();
+  let top = rect.bottom + 4;
+  let left = rect.left;
+  if (left + 280 > window.innerWidth) left = window.innerWidth - 290;
+  if (top + 140 > window.innerHeight) top = rect.top - 140;
+  popup.style.top = top + 'px';
+  popup.style.left = left + 'px';
+
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+
+  function close() {
+    onSave(ta.value.trim());
+    popup.remove();
+  }
+
+  ta.onkeydown = (e) => { if (e.key === 'Escape') { close(); } };
+
+  setTimeout(() => {
+    document.addEventListener('mousedown', function handler(e) {
+      if (!popup.contains(e.target)) {
+        close();
+        document.removeEventListener('mousedown', handler);
+      }
+    });
+  }, 10);
+}
+
+// 히스토리 데이터 추가 (빈 주차에만 추가, 기존 데이터 유지)
+function importHistoricalData() {
+  const defaultWeeksMap = {};
+  DEFAULT_DATA.weeks.forEach(w => { defaultWeeksMap[w.id] = w; });
+
+  let changed = 0;
+  appData.weeks.forEach(w => {
+    const defWeek = defaultWeeksMap[w.id];
+    if (defWeek && defWeek.projects && defWeek.projects.length > 0 &&
+        (!w.projects || w.projects.length === 0)) {
+      w.notes = JSON.parse(JSON.stringify(defWeek.notes));
+      w.projects = JSON.parse(JSON.stringify(defWeek.projects));
+      changed++;
+    }
+  });
+
+  if (changed > 0) {
+    save();
+    render();
+    document.getElementById('importHistBtn').style.display = 'none';
+    alert(`${changed}개 주차의 히스토리 데이터가 추가됐어요!`);
+  } else {
+    alert('추가할 히스토리 데이터가 없어요.\n(이미 데이터가 있는 주차는 건드리지 않아요)');
+  }
+}
+
+function resetData() {
+  if (confirm('기본 데이터로 초기화할까요?\n현재 Firebase에 저장된 데이터가 기본 데이터로 교체됩니다.')) {
+    appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
+    dataRef.set(appData)
+      .then(() => { render(); alert('초기화 완료!'); })
+      .catch(e => alert('저장 실패: Firebase 권한을 확인해주세요.\n' + e.message));
+  }
+}
+
+function makeWeek(week) {
+  const sec = document.createElement('div');
+  sec.className = 'week-section' + (week.expanded ? '' : ' collapsed');
+  sec.id = 'week-' + week.id;
+
+  // Header
+  const hdr = document.createElement('div');
+  hdr.className = 'week-header';
+  hdr.innerHTML = `<span class="week-toggle">▼</span><span class="week-title">${week.title}</span><button class="week-del-btn" title="주차 삭제">🗑</button>`;
+  hdr.onclick = (e) => {
+    if (e.target.classList.contains('week-del-btn')) return;
+    if (e.target.classList.contains('week-title')) return;
+    week.expanded = !week.expanded; save(); render();
+  };
+
+  // 타이틀 인라인 편집
+  const titleEl = hdr.querySelector('.week-title');
+  titleEl.onclick = (e) => {
+    e.stopPropagation();
+    titleEl.contentEditable = 'true';
+    titleEl.focus();
+    const range = document.createRange();
+    range.selectNodeContents(titleEl);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  };
+  const saveTitle = () => {
+    const val = titleEl.textContent.trim();
+    week.title = val || week.title;
+    titleEl.textContent = week.title;
+    titleEl.contentEditable = 'false';
+    save();
+  };
+  titleEl.onblur = saveTitle;
+  titleEl.onkeydown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); saveTitle(); }
+    if (e.key === 'Escape') { titleEl.textContent = week.title; titleEl.contentEditable = 'false'; }
+  };
+  hdr.querySelector('.week-del-btn').onclick = (e) => {
+    e.stopPropagation();
+    if (confirm(`"${week.title}" 주차를 삭제할까요?\n이 주차의 모든 데이터가 삭제됩니다.`)) {
+      appData.weeks = appData.weeks.filter(w => w.id !== week.id);
+      save(); render();
+    }
+  };
+  sec.appendChild(hdr);
+
+  // Content
+  const content = document.createElement('div');
+  content.className = 'week-content';
+
+  // Notes — always visible, editable
+  {
+    const notesDiv = document.createElement('div');
+    notesDiv.className = 'week-notes';
+
+    const EMOJI_LIST = ['🎸','📝','💡','🎯','🔥','⭐','🚀','🎉','📌','💬','🌟','✅','📋','🎵','🌈','💪','🗓','🔔','😊','🤔'];
+
+    const hdr = document.createElement('div');
+    hdr.className = 'notes-header';
+
+    const emojiBtn = document.createElement('span');
+    emojiBtn.textContent = week.emoji || '🎸';
+    emojiBtn.title = '클릭해서 이모지 변경';
+    emojiBtn.style.cssText = 'cursor:pointer;border-radius:4px;padding:1px 3px;transition:background 0.1s';
+    emojiBtn.onmouseenter = () => emojiBtn.style.background = '#e9e9e7';
+    emojiBtn.onmouseleave = () => emojiBtn.style.background = 'transparent';
+
+    emojiBtn.onclick = (e) => {
+      e.stopPropagation();
+      const existing = document.getElementById('_emojiPicker');
+      if (existing) { existing.remove(); return; }
+
+      const picker = document.createElement('div');
+      picker.id = '_emojiPicker';
+      picker.style.cssText = 'position:fixed;background:white;border:1px solid #e9e9e7;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.12);padding:10px;z-index:3000;display:grid;grid-template-columns:repeat(5,1fr);gap:4px;width:180px';
+
+      EMOJI_LIST.forEach(em => {
+        const btn = document.createElement('button');
+        btn.textContent = em;
+        btn.style.cssText = 'border:none;background:none;cursor:pointer;font-size:20px;padding:4px;border-radius:6px;text-align:center;line-height:1';
+        btn.onmouseenter = () => btn.style.background = '#f1f0ef';
+        btn.onmouseleave = () => btn.style.background = 'none';
+        btn.onclick = () => {
+          week.emoji = em;
+          emojiBtn.textContent = em;
+          picker.remove();
+          save();
+        };
+        picker.appendChild(btn);
+      });
+
+      document.body.appendChild(picker);
+      const rect = emojiBtn.getBoundingClientRect();
+      picker.style.top = (rect.bottom + 6) + 'px';
+      picker.style.left = rect.left + 'px';
+
+      setTimeout(() => {
+        document.addEventListener('mousedown', function closePicker(ev) {
+          if (!picker.contains(ev.target) && ev.target !== emojiBtn) {
+            picker.remove();
+            document.removeEventListener('mousedown', closePicker);
+          }
+        });
+      }, 10);
+    };
+
+    hdr.appendChild(emojiBtn);
+    notesDiv.appendChild(hdr);
+
+    const notesArea = document.createElement('div');
+    notesArea.className = 'notes-area';
+
+    function renderNoteItems() {
+      notesArea.innerHTML = '';
+      (week.notes || []).forEach((note, i) => {
+        const item = document.createElement('div');
+        item.className = 'notes-edit-item';
+        const bullet = document.createElement('span');
+        bullet.className = 'notes-bullet';
+        bullet.textContent = '•';
+        const noteEl = document.createElement('div');
+        noteEl.className = 'notes-editable';
+        noteEl.contentEditable = 'true';
+        noteEl.textContent = note;
+        noteEl.onblur = () => {
+          const val = noteEl.textContent.trim();
+          if (!val) {
+            week.notes.splice(i, 1);
+            renderNoteItems();
+          } else {
+            week.notes[i] = val;
+          }
+          save();
+        };
+        noteEl.onkeydown = (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            week.notes.splice(i + 1, 0, '');
+            renderNoteItems();
+            const els = notesArea.querySelectorAll('.notes-editable');
+            if (els[i + 1]) els[i + 1].focus();
+          }
+          if (e.key === 'Backspace' && noteEl.textContent === '') {
+            e.preventDefault();
+            week.notes.splice(i, 1);
+            renderNoteItems();
+            const els = notesArea.querySelectorAll('.notes-editable');
+            if (els[i - 1]) els[i - 1].focus();
+            save();
+          }
+        };
+        item.appendChild(bullet);
+        item.appendChild(noteEl);
+        notesArea.appendChild(item);
+      });
+
+      // Add row hint
+      const addRow = document.createElement('div');
+      addRow.className = 'notes-add-row';
+      addRow.innerHTML = '<span>•</span><span>클릭하여 메모 추가</span>';
+      addRow.onclick = () => {
+        if (!week.notes) week.notes = [];
+        week.notes.push('');
+        renderNoteItems();
+        const els = notesArea.querySelectorAll('.notes-editable');
+        if (els[els.length - 1]) els[els.length - 1].focus();
+      };
+      notesArea.appendChild(addRow);
+    }
+
+    renderNoteItems();
+    notesDiv.appendChild(notesArea);
+    content.appendChild(notesDiv);
+  }
+
+  // Tabs - dynamic
+  const TABS = [
+    { id: 'meeting',  label: '🗂 회의록' },
+    { id: 'status',   label: '📊 상태별' },
+    { id: 'category', label: '📁 프로젝트별' },
+    { id: 'member',   label: '👤 멤버별' },
+  ];
+  const activeTab = weekTabState[week.id] || 'meeting';
+
+  const tabsBar = document.createElement('div');
+  tabsBar.className = 'tabs-bar';
+  TABS.forEach(t => {
+    const btn = document.createElement('button');
+    btn.className = 'tab-btn' + (activeTab === t.id ? ' active' : '');
+    btn.textContent = t.label;
+    btn.onclick = () => {
+      weekTabState[week.id] = t.id;
+      tabsBar.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', TABS[i].id === t.id));
+      contentArea.innerHTML = '';
+      contentArea.appendChild(makeWeekContent(week, t.id));
+    };
+    tabsBar.appendChild(btn);
+  });
+  const spacer = document.createElement('div');
+  spacer.className = 'tabs-spacer';
+  tabsBar.appendChild(spacer);
+  const createBtn = document.createElement('button');
+  createBtn.className = 'btn-create';
+  createBtn.textContent = '+ 새로 만들기';
+  createBtn.onclick = () => addProject(week.id);
+  tabsBar.appendChild(createBtn);
+  content.appendChild(tabsBar);
+
+  // Swappable content area
+  const contentArea = document.createElement('div');
+  contentArea.appendChild(makeWeekContent(week, activeTab));
+  content.appendChild(contentArea);
+
+  sec.appendChild(content);
+  return sec;
+}
+
+function makeRow(week, proj) {
+  const tr = document.createElement('tr');
+  tr.dataset.projId = proj.id;
+  tr.draggable = true;
+
+  // Drag handle
+  const tdHandle = document.createElement('td');
+  tdHandle.style.textAlign = 'center';
+  tdHandle.innerHTML = `<span class="drag-handle" title="순서 변경">⠿</span>`;
+
+  // Drag events
+  tr.addEventListener('dragstart', (e) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', proj.id);
+    setTimeout(() => tr.style.opacity = '0.4', 0);
+  });
+  tr.addEventListener('dragend', () => { tr.style.opacity = ''; tr.classList.remove('drag-over'); });
+  tr.addEventListener('dragover', (e) => { e.preventDefault(); tr.classList.add('drag-over'); });
+  tr.addEventListener('dragleave', () => tr.classList.remove('drag-over'));
+  tr.addEventListener('drop', (e) => {
+    e.preventDefault();
+    tr.classList.remove('drag-over');
+    const fromId = e.dataTransfer.getData('text/plain');
+    if (fromId === proj.id) return;
+    const fromIdx = week.projects.findIndex(p => p.id === fromId);
+    const toIdx   = week.projects.findIndex(p => p.id === proj.id);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const [moved] = week.projects.splice(fromIdx, 1);
+    week.projects.splice(toIdx, 0, moved);
+    save(); render();
+  });
+
+  // Category
+  const tdCat = document.createElement('td');
+  tdCat.innerHTML = `<span class="cat-badge cat-${proj.cat}">${proj.cat}</span>`;
+
+  // Project name
+  const tdName = document.createElement('td');
+  const nameWrap = document.createElement('div');
+  nameWrap.className = 'proj-name-wrap';
+  nameWrap.innerHTML = `<span class="proj-name">${proj.name}</span>`;
+  nameWrap.onclick = () => openDetail(week.id, proj.id);
+  tdName.appendChild(nameWrap);
+
+  // Members (editable)
+  const tdMembers = document.createElement('td');
+
+  function renderMemberCell() {
+    tdMembers.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'td-members-wrap avatars-wrap';
+    const MAX = 4;
+    if (proj.members.length === 0) {
+      const hint = document.createElement('span');
+      hint.className = 'td-members-add';
+      hint.textContent = '+ 담당자';
+      wrap.appendChild(hint);
+    } else {
+      proj.members.slice(0, MAX).forEach(m => {
+        const avWrap = document.createElement('div');
+        avWrap.className = 'avatar-wrap';
+        const av = document.createElement('div');
+        av.className = 'avatar';
+        av.style.background = memberColor(m);
+        av.textContent = initials(m);
+        const tip = document.createElement('div');
+        tip.className = 'avatar-tooltip';
+        tip.textContent = m;
+        avWrap.appendChild(av);
+        avWrap.appendChild(tip);
+        wrap.appendChild(avWrap);
+      });
+      if (proj.members.length > MAX) {
+        const ex = document.createElement('span');
+        ex.className = 'avatar-extra';
+        ex.textContent = `+${proj.members.length - MAX}`;
+        wrap.appendChild(ex);
+      }
+    }
+    tdMembers.appendChild(wrap);
+  }
+  renderMemberCell();
+
+  tdMembers.onclick = (e) => {
+    e.stopPropagation();
+    showMemberPicker(tdMembers, proj.members, (members) => {
+      proj.members = members;
+      save();
+      renderMemberCell();
+    });
+  };
+
+  // Status (click to cycle)
+  const STATUS_CYCLE = ['예정', '진행중', '완료', '대기'];
+  const tdStatus = document.createElement('td');
+  const renderStatus = () => {
+    tdStatus.innerHTML = `<span class="status-badge s-${proj.status}" title="클릭해서 변경"><span class="status-dot"></span>${proj.status}</span>`;
+    tdStatus.querySelector('.status-badge').onclick = () => {
+      const idx = STATUS_CYCLE.indexOf(proj.status);
+      proj.status = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
+      save();
+      renderStatus();
+    };
+  };
+  renderStatus();
+
+  // 셀 클릭 시 텍스트 잘림 여부에 따라 인라인 편집 or 팝업
+  function makeCellInput(td, initialVal, onSave) {
+    const wrap = document.createElement('div');
+    wrap.className = 'cell-wrap';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'cell-input';
+    input.value = initialVal || '';
+    input.placeholder = '-';
+    input.addEventListener('input', () => onSave(input.value));
+    input.addEventListener('mousedown', (e) => {
+      // 이미 포커스된 상태면 일반 커서 이동 허용
+      if (document.activeElement === input) return;
+      // 텍스트가 잘려있으면 팝업으로
+      if (input.scrollWidth > input.clientWidth) {
+        e.preventDefault();
+        showTextPopup(td, input.value, (val) => {
+          onSave(val);
+          input.value = val;
+        });
+      }
+      // 잘려있지 않으면 그냥 focus → 인라인 편집
+    });
+    input.addEventListener('click', e => e.stopPropagation());
+    wrap.appendChild(input);
+    td.appendChild(wrap);
+    return input;
+  }
+
+  // Goal
+  const tdGoal = document.createElement('td');
+  makeCellInput(tdGoal, proj.goal, (val) => { proj.goal = val; save(); });
+
+  // Issue
+  const tdIssue = document.createElement('td');
+  makeCellInput(tdIssue, proj.issue, (val) => { proj.issue = val; save(); });
+
+  // Delete button
+  const tdDel = document.createElement('td');
+  tdDel.style.textAlign = 'center';
+  const delBtn = document.createElement('button');
+  delBtn.className = 'row-del-btn';
+  delBtn.title = '프로젝트 삭제';
+  delBtn.textContent = '🗑';
+  delBtn.onclick = () => {
+    if (confirm(`"${proj.name}" 프로젝트를 삭제할까요?`)) {
+      week.projects = week.projects.filter(p => p.id !== proj.id);
+      save(); render();
+    }
+  };
+  tdDel.appendChild(delBtn);
+
+  tr.append(tdHandle, tdCat, tdName, tdMembers, tdStatus, tdGoal, tdIssue, tdDel);
+  return tr;
+}
+
+// ────────────────────────────────────────────────
+//  WEEK CONTENT SWITCHER
+// ────────────────────────────────────────────────
+function makeWeekContent(week, tab) {
+  if (tab === 'status')   return makeKanbanView(week, 'status');
+  if (tab === 'category') return makeKanbanView(week, 'category');
+  if (tab === 'member')   return makeKanbanView(week, 'member');
+  return makeMeetingTable(week);
+}
+
+function makeMeetingTable(week) {
+  const frag = document.createDocumentFragment();
+  const table = document.createElement('table');
+  table.className = 'meeting-table';
+  table.innerHTML = `
+    <thead><tr>
+      <th style="width:24px;min-width:24px"></th>
+      <th style="width:60px;min-width:60px">구분</th>
+      <th style="width:160px;max-width:160px">프로젝트</th>
+      <th style="width:148px;min-width:148px">담당자</th>
+      <th style="width:78px;min-width:78px">상태</th>
+      <th style="width:200px;min-width:200px">이번주 목표</th>
+      <th style="width:200px;min-width:200px">주요 이슈</th>
+      <th style="width:36px;min-width:36px"></th>
+    </tr></thead>`;
+  const tbody = document.createElement('tbody');
+  week.projects.forEach(p => tbody.appendChild(makeRow(week, p)));
+  table.appendChild(tbody);
+  frag.appendChild(table);
+  const addBtn = document.createElement('button');
+  addBtn.className = 'add-row-btn';
+  addBtn.textContent = '+ 신규 item';
+  addBtn.onclick = () => addProject(week.id);
+  frag.appendChild(addBtn);
+  return frag;
+}
+
+// ────────────────────────────────────────────────
+//  KANBAN VIEWS
+// ────────────────────────────────────────────────
+const STATUS_GROUPS = [
+  { key: '예정',  dot: '#f5c842', bg: '#fef6e4' },
+  { key: '진행중', dot: '#2383e2', bg: '#eef4fd' },
+  { key: '완료',  dot: '#4caf50', bg: '#f0faf0' },
+  { key: '대기',  dot: '#b3b3b3', bg: '#f7f6f5' },
+];
+const CAT_GROUPS = [
+  { key: '제안', bg: '#fef3e2' },
+  { key: '구축', bg: '#e8f0ff' },
+  { key: '운영', bg: '#e8faeb' },
+  { key: '내부', bg: '#f2e8ff' },
+];
+
+function makeKanbanView(week, groupBy) {
+  const board = document.createElement('div');
+  board.className = 'kanban-board';
+
+  if (groupBy === 'status') {
+    STATUS_GROUPS.forEach(g => {
+      const projects = week.projects.filter(p => p.status === g.key);
+      board.appendChild(makeKanbanCol(week, { ...g, label: g.key, projects }, 'status'));
+    });
+
+  } else if (groupBy === 'category') {
+    CAT_GROUPS.forEach(g => {
+      const projects = week.projects.filter(p => p.cat === g.key);
+      board.appendChild(makeKanbanCol(week, { ...g, label: g.key, projects }, 'category'));
+    });
+
+  } else if (groupBy === 'member') {
+    // Collect unique members in order of appearance
+    const seen = new Set();
+    const members = [];
+    week.projects.forEach(p => p.members.forEach(m => { if (!seen.has(m)) { seen.add(m); members.push(m); } }));
+    members.forEach(m => {
+      const projects = week.projects.filter(p => p.members.includes(m));
+      board.appendChild(makeKanbanCol(week, { key: m, label: m, bg: null, projects }, 'member'));
+    });
+  }
+
+  return board;
+}
+
+function makeKanbanCol(week, group, viewType) {
+  const col = document.createElement('div');
+  col.className = 'kanban-col' + (viewType === 'member' ? ' kanban-col-member' : '');
+  if (group.bg) col.style.background = group.bg;
+
+  // Column header
+  const hdr = document.createElement('div');
+  hdr.className = 'kanban-col-hdr';
+
+  if (viewType === 'status') {
+    const dot = document.createElement('span');
+    dot.className = 'status-dot';
+    dot.style.background = group.dot;
+    hdr.appendChild(dot);
+    hdr.appendChild(Object.assign(document.createElement('span'), { textContent: group.label }));
+  } else if (viewType === 'category') {
+    hdr.innerHTML = `<span class="cat-badge cat-${group.key}">${group.label}</span>`;
+  } else if (viewType === 'member') {
+    const av = document.createElement('div');
+    av.className = 'kanban-avatar-lg';
+    av.style.background = memberColor(group.label);
+    av.textContent = initials(group.label);
+    hdr.appendChild(av);
+    hdr.appendChild(Object.assign(document.createElement('span'), { textContent: group.label }));
+  }
+
+  const countEl = document.createElement('span');
+  countEl.className = 'kanban-col-count';
+  countEl.textContent = group.projects.length;
+  hdr.appendChild(countEl);
+  col.appendChild(hdr);
+
+  // Cards
+  group.projects.forEach(proj => {
+    col.appendChild(makeKanbanCard(week, proj, viewType));
+  });
+
+  // Add button
+  const addBtn = document.createElement('button');
+  addBtn.className = 'kanban-add-btn';
+  addBtn.textContent = '+ 신규 item';
+  addBtn.onclick = () => addProject(week.id);
+  col.appendChild(addBtn);
+
+  return col;
+}
+
+function makeKanbanCard(week, proj, viewType) {
+  if (viewType === 'member') {
+    const item = document.createElement('div');
+    item.className = 'kanban-member-item';
+    item.innerHTML = `<span>${proj.name}</span>`;
+    item.onclick = () => openDetail(week.id, proj.id);
+    return item;
+  }
+
+  const card = document.createElement('div');
+  card.className = 'kanban-card';
+  card.onclick = () => openDetail(week.id, proj.id);
+
+  // Name
+  const nameEl = document.createElement('div');
+  nameEl.className = 'kanban-card-name';
+  nameEl.innerHTML = `<span>${proj.name}</span>`;
+  card.appendChild(nameEl);
+
+  // Members (chip: avatar + name)
+  if (proj.members.length > 0) {
+    const chipRow = document.createElement('div');
+    chipRow.className = 'kanban-chip-row';
+    proj.members.forEach(m => {
+      const chip = document.createElement('div');
+      chip.className = 'kanban-chip';
+      chip.innerHTML = `<div class="avatar" style="background:${memberColor(m)}">${initials(m)}</div><span>${m}</span>`;
+      chipRow.appendChild(chip);
+    });
+    card.appendChild(chipRow);
+  }
+
+  // Status view → show goal
+  if (viewType === 'status') {
+    const goal = proj.goal && proj.goal !== '-' ? proj.goal : '';
+    if (goal) {
+      const goalEl = document.createElement('div');
+      goalEl.className = 'kanban-card-goal';
+      goalEl.textContent = goal;
+      card.appendChild(goalEl);
+    }
+  }
+
+  // Category view → show status badge
+  if (viewType === 'category') {
+    const statusEl = document.createElement('div');
+    statusEl.className = 'kanban-card-status';
+    statusEl.innerHTML = `<span class="status-badge s-${proj.status}" style="cursor:default"><span class="status-dot"></span>${proj.status}</span>`;
+    card.appendChild(statusEl);
+  }
+
+  return card;
+}
+
+// ────────────────────────────────────────────────
+//  DETAIL PANEL
+// ────────────────────────────────────────────────
+function openDetail(weekId, projId) {
+  const week = appData.weeks.find(w => w.id === weekId);
+  const proj = week?.projects.find(p => p.id === projId);
+  if (!proj) return;
+  currentRef = { weekId, projId };
+
+  document.getElementById('dpMeta').innerHTML = `
+    <span class="cat-badge cat-${proj.cat}">${proj.cat}</span>
+    <span style="color:#9b9a97">${week.title}</span>
+  `;
+  const dpTitle = document.getElementById('dpTitle');
+  dpTitle.textContent = proj.name;
+  dpTitle.contentEditable = 'true';
+  dpTitle.title = '클릭하여 프로젝트명 수정';
+
+  // 프로젝트명 저장
+  const saveName = () => {
+    if (!currentRef) return;
+    const w = appData.weeks.find(x => x.id === currentRef.weekId);
+    const p = w?.projects.find(x => x.id === currentRef.projId);
+    if (p) {
+      const newName = dpTitle.textContent.trim();
+      if (newName) { p.name = newName; save(); }
+      else { dpTitle.textContent = p.name; }
+    }
+  };
+  dpTitle.onblur = saveName;
+  dpTitle.onkeydown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); dpTitle.blur(); }
+  };
+
+  document.getElementById('dpEditor').value = proj.detail || '';
+
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('detailPanel').classList.add('open');
+  setTimeout(() => document.getElementById('dpEditor').focus(), 250);
+}
+
+function closeDetail() {
+  if (currentRef) {
+    const week = appData.weeks.find(w => w.id === currentRef.weekId);
+    const proj = week?.projects.find(p => p.id === currentRef.projId);
+    if (proj) {
+      const dpTitle = document.getElementById('dpTitle');
+      const newName = dpTitle.textContent.trim();
+      if (newName) proj.name = newName;
+      proj.detail = document.getElementById('dpEditor').value;
+      save();
+    }
+    currentRef = null;
+  }
+  document.getElementById('overlay').classList.remove('open');
+  document.getElementById('detailPanel').classList.remove('open');
+}
+
+document.getElementById('dpEditor').addEventListener('input', () => {
+  if (!currentRef) return;
+  const week = appData.weeks.find(w => w.id === currentRef.weekId);
+  const proj = week?.projects.find(p => p.id === currentRef.projId);
+  if (proj) { proj.detail = document.getElementById('dpEditor').value; save(); }
+});
+
+// ────────────────────────────────────────────────
+//  MEMBER PICKER
+// ────────────────────────────────────────────────
+function showMemberPicker(anchorEl, currentMembers, onChange) {
+  document.querySelector('.member-picker')?.remove();
+
+  const picker = document.createElement('div');
+  picker.className = 'member-picker';
+
+  // Position below anchor
+  const rect = anchorEl.getBoundingClientRect();
+  let top = rect.bottom + 4;
+  let left = rect.left;
+  if (left + 300 > window.innerWidth - 10) left = window.innerWidth - 310;
+  if (top + 280 > window.innerHeight - 10) top = rect.top - 284;
+  picker.style.top = top + 'px';
+  picker.style.left = left + 'px';
+
+  let selected = [...currentMembers];
+
+  // Input area — chips + search input in one flex-wrap row
+  const inputArea = document.createElement('div');
+  inputArea.className = 'mp-input-area';
+  const searchInput = document.createElement('input');
+  searchInput.className = 'mp-search';
+  searchInput.placeholder = '이름 검색...';
+  inputArea.appendChild(searchInput);
+  // click on area → focus input
+  inputArea.onclick = () => searchInput.focus();
+
+  const hint = document.createElement('div');
+  hint.className = 'mp-hint';
+  hint.textContent = '원하는 만큼 선택';
+
+  const list = document.createElement('div');
+  list.className = 'mp-list';
+
+  picker.appendChild(inputArea);
+  picker.appendChild(hint);
+  picker.appendChild(list);
+  document.body.appendChild(picker);
+
+  function renderChips() {
+    // chip만 제거 (searchInput 유지)
+    [...inputArea.children].forEach(el => { if (el !== searchInput) el.remove(); });
+    selected.forEach(m => {
+      const chip = document.createElement('div');
+      chip.className = 'mp-chip';
+      chip.innerHTML = `<div class="avatar" style="background:${memberColor(m)};width:18px;height:18px;font-size:9px;border:none;flex-shrink:0">${initials(m)}</div><span>${m}</span>`;
+      const del = document.createElement('button');
+      del.className = 'mp-chip-del';
+      del.textContent = '×';
+      del.onclick = (e) => {
+        e.stopPropagation();
+        selected = selected.filter(x => x !== m);
+        onChange([...selected]);
+        renderChips();
+        renderList(searchInput.value);
+      };
+      chip.appendChild(del);
+      inputArea.insertBefore(chip, searchInput); // input 앞에 삽입
+    });
+  }
+
+  function renderList(filter = '') {
+    list.innerHTML = '';
+    // 선택되지 않은 멤버만 표시
+    const unselected = ALL_MEMBERS.filter(m =>
+      !selected.includes(m) && (filter === '' || m.includes(filter))
+    );
+    if (unselected.length === 0 && filter === '') {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'padding:12px;color:#9b9a97;font-size:13px;text-align:center';
+      empty.textContent = '모든 멤버가 선택되었어요';
+      list.appendChild(empty);
+      return;
+    }
+    unselected.forEach(m => {
+      const item = document.createElement('div');
+      item.className = 'mp-item';
+      item.innerHTML = `
+        <div class="avatar" style="background:${memberColor(m)};width:28px;height:28px;font-size:12px;border:none;flex-shrink:0">${initials(m)}</div>
+        <span>${m}</span>`;
+      item.onclick = () => {
+        selected = [...selected, m];
+        onChange([...selected]);
+        renderChips();
+        renderList(searchInput.value);
+      };
+      list.appendChild(item);
+    });
+  }
+
+  renderChips();
+  renderList();
+  searchInput.oninput = () => renderList(searchInput.value);
+  setTimeout(() => searchInput.focus(), 30);
+
+  function handleOutside(e) {
+    if (!picker.contains(e.target) && !anchorEl.contains(e.target)) {
+      picker.remove();
+      document.removeEventListener('mousedown', handleOutside);
+    }
+  }
+  setTimeout(() => document.addEventListener('mousedown', handleOutside), 0);
+}
+
+// ────────────────────────────────────────────────
+//  ADD PROJECT
+// ────────────────────────────────────────────────
+function addProject(weekId) {
+  const week = appData.weeks.find(w => w.id === weekId);
+  if (!week) return;
+
+  let newProjMembers = [];
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal-box">
+      <div class="modal-title">새 프로젝트 추가</div>
+      <input class="modal-input" id="newProjName" placeholder="프로젝트 이름" autofocus>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <select id="newProjCat" style="flex:1;padding:8px;border:1px solid #e9e9e7;border-radius:6px;font-family:inherit;font-size:13px">
+          <option value="운영">운영</option>
+          <option value="구축">구축</option>
+          <option value="제안">제안</option>
+          <option value="내부">내부</option>
+        </select>
+        <select id="newProjStatus" style="flex:1;padding:8px;border:1px solid #e9e9e7;border-radius:6px;font-family:inherit;font-size:13px">
+          <option value="진행중">진행중</option>
+          <option value="예정">예정</option>
+          <option value="대기">대기</option>
+        </select>
+      </div>
+      <div style="margin-bottom:16px">
+        <div style="font-size:12px;color:#9b9a97;font-weight:500;margin-bottom:6px">담당자</div>
+        <div id="mpModalTrigger" class="modal-member-trigger">
+          <span id="mpModalHint" style="color:#c4c2be;font-size:13px">클릭해서 담당자 추가</span>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="modal-cancel" onclick="this.closest('.modal-overlay').remove()">취소</button>
+        <button class="modal-confirm" onclick="confirmAddProject('${weekId}',this)">추가</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  const trigger = modal.querySelector('#mpModalTrigger');
+
+  function updateTrigger() {
+    trigger.innerHTML = '';
+    if (newProjMembers.length === 0) {
+      trigger.innerHTML = '<span style="color:#c4c2be;font-size:13px">클릭해서 담당자 추가</span>';
+    } else {
+      newProjMembers.forEach(m => {
+        const chip = document.createElement('div');
+        chip.className = 'mp-chip';
+        chip.innerHTML = `<div class="avatar" style="background:${memberColor(m)};width:18px;height:18px;font-size:9px;border:none">${initials(m)}</div><span>${m}</span>`;
+        trigger.appendChild(chip);
+      });
+    }
+  }
+
+  trigger.onclick = (e) => {
+    e.stopPropagation();
+    showMemberPicker(trigger, newProjMembers, (members) => {
+      newProjMembers = members;
+      updateTrigger();
+    });
+  };
+
+  // Store getter on modal box for confirmAddProject to read
+  modal.querySelector('.modal-box')._getMembers = () => newProjMembers;
+
+  setTimeout(() => modal.querySelector('#newProjName').focus(), 50);
+  modal.querySelector('#newProjName').addEventListener('keydown', e => {
+    if (e.key === 'Enter') modal.querySelector('.modal-confirm').click();
+    if (e.key === 'Escape') { document.querySelector('.member-picker')?.remove(); modal.remove(); }
+  });
+}
+
+function confirmAddProject(weekId, btn) {
+  const modal = btn.closest('.modal-overlay');
+  const name = modal.querySelector('#newProjName').value.trim();
+  if (!name) { modal.querySelector('#newProjName').focus(); return; }
+  const cat = modal.querySelector('#newProjCat').value;
+  const status = modal.querySelector('#newProjStatus').value;
+  const members = modal.querySelector('.modal-box')._getMembers?.() || [];
+  const week = appData.weeks.find(w => w.id === weekId);
+  week.projects.push({ id:'p'+Date.now(), cat, name, members, status, goal:'', issue:'', detail:'' });
+  save();
+  document.querySelector('.member-picker')?.remove();
+  modal.remove();
+  render();
+}
+
+// ────────────────────────────────────────────────
+//  CURRENT WEEK TITLE HELPER
+// ────────────────────────────────────────────────
+function getCurrentWeekTitle() {
+  const now = new Date();
+  const day = now.getDay(); // 0=일, 1=월, ..., 6=토
+  // 이번 주 월요일 구하기
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+
+  const year = monday.getFullYear();
+  const month = monday.getMonth() + 1;
+  const dayOfMonth = monday.getDate();
+  const weekNum = Math.ceil(dayOfMonth / 7);
+
+  return `${year}년 ${month}월 ${weekNum}주차`;
+}
+
+// ────────────────────────────────────────────────
+//  ADD WEEK
+// ────────────────────────────────────────────────
+function showAddWeek() {
+  const suggestedTitle = getCurrentWeekTitle();
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal-box">
+      <div class="modal-title">이번주 생성</div>
+      <input class="modal-input" id="newWeekTitle" value="${suggestedTitle}" autofocus>
+      <div class="modal-actions">
+        <button class="modal-cancel" onclick="this.closest('.modal-overlay').remove()">취소</button>
+        <button class="modal-confirm" onclick="confirmAddWeek(this)">추가</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  const input = modal.querySelector('#newWeekTitle');
+  setTimeout(() => { input.focus(); input.select(); }, 50);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') modal.querySelector('.modal-confirm').click();
+    if (e.key === 'Escape') modal.remove();
+  });
+}
+
+function confirmAddWeek(btn) {
+  const modal = btn.closest('.modal-overlay');
+  const title = modal.querySelector('#newWeekTitle').value.trim();
+  if (!title) { modal.querySelector('#newWeekTitle').focus(); return; }
+  const id = 'w' + Date.now();
+
+  // 이전 주차의 프로젝트 목록을 복사 (목표/이슈/상세 내용은 초기화)
+  const prevWeek = appData.weeks[0];
+  const copiedProjects = prevWeek
+    ? prevWeek.projects.map(p => ({
+        ...p,
+        id: 'p' + Date.now() + Math.random().toString(36).slice(2, 6),
+        goal: '',
+        issue: '',
+        detail: ''
+      }))
+    : [];
+
+  appData.weeks.unshift({ id, title, expanded: true, notes: [], projects: copiedProjects });
+  save();
+  modal.remove();
+  render();
+}
+
+// ────────────────────────────────────────────────
+//  KEYBOARD
+// ────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeDetail();
+});
+// Firebase 실시간 리스너가 render()를 호출하므로 별도 init 불필요
+</script>
+</body>
+</html>
