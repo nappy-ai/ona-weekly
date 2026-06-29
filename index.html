@@ -1269,7 +1269,13 @@ function makeRow(week, proj) {
   tr.addEventListener('dragstart', (e) => {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', proj.id);
-    setTimeout(() => tr.style.opacity = '0.4', 0);
+    // 깔끔한 커스텀 ghost 이미지
+    const ghost = document.createElement('div');
+    ghost.textContent = proj.name;
+    ghost.style.cssText = 'position:fixed;top:-200px;left:0;background:#fff;padding:6px 14px;border-radius:6px;box-shadow:0 2px 10px rgba(0,0,0,0.15);font-size:13px;color:#37352f;white-space:nowrap;pointer-events:none;';
+    document.body.appendChild(ghost);
+    e.dataTransfer.setDragImage(ghost, 12, 16);
+    setTimeout(() => { ghost.remove(); tr.style.opacity = '0.35'; }, 0);
   });
   tr.addEventListener('dragend', () => { tr.style.opacity = ''; tr.classList.remove('drag-over'); });
   tr.addEventListener('dragover', (e) => { e.preventDefault(); tr.classList.add('drag-over'); });
