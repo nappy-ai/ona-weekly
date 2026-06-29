@@ -234,8 +234,7 @@
     }
     .drag-handle:hover { color: #9b9a97; }
     .drag-handle:active { cursor: grabbing; }
-    tr.drop-above > td { box-shadow: inset 0 2px 0 #0066ff; }
-    tr.drop-below > td { box-shadow: inset 0 -2px 0 #0066ff; }
+    tr.drop-line > td { padding: 0; height: 2px; background: #0066ff; border: none; }
     .proj-name {
       color: #37352f;
       overflow: hidden;
@@ -1278,18 +1277,34 @@ function makeRow(week, proj) {
     e.dataTransfer.setDragImage(ghost, 12, 16);
     setTimeout(() => { ghost.remove(); tr.style.opacity = '0.35'; }, 100);
   });
-  tr.addEventListener('dragend', () => { tr.style.opacity = ''; tr.classList.remove('drop-above', 'drop-below'); });
+  function getDropLine() {
+    let line = document.getElementById('_dropLine');
+    if (!line) {
+      line = document.createElement('tr');
+      line.id = '_dropLine';
+      line.className = 'drop-line';
+      line.innerHTML = '<td colspan="8"></td>';
+    }
+    return line;
+  }
+  function removeDropLine() { document.getElementById('_dropLine')?.remove(); }
+
+  tr.addEventListener('dragend', () => { tr.style.opacity = ''; removeDropLine(); });
   tr.addEventListener('dragover', (e) => {
     e.preventDefault();
-    const mid = tr.getBoundingClientRect().top + tr.getBoundingClientRect().height / 2;
-    tr.classList.remove('drop-above', 'drop-below');
-    tr.classList.add(e.clientY < mid ? 'drop-above' : 'drop-below');
+    const rect = tr.getBoundingClientRect();
+    const above = e.clientY < rect.top + rect.height / 2;
+    const line = getDropLine();
+    tr.parentNode.insertBefore(line, above ? tr : tr.nextSibling);
   });
-  tr.addEventListener('dragleave', () => tr.classList.remove('drop-above', 'drop-below'));
+  tr.addEventListener('dragleave', (e) => {
+    if (!tr.contains(e.relatedTarget)) removeDropLine();
+  });
   tr.addEventListener('drop', (e) => {
     e.preventDefault();
-    const dropAbove = tr.classList.contains('drop-above');
-    tr.classList.remove('drop-above', 'drop-below');
+    const line = document.getElementById('_dropLine');
+    const insertBefore = line && line.nextSibling === tr;
+    removeDropLine();
     const fromId = e.dataTransfer.getData('text/plain');
     if (fromId === proj.id) return;
     const fromIdx = week.projects.findIndex(p => p.id === fromId);
@@ -1297,7 +1312,7 @@ function makeRow(week, proj) {
     const [moved] = week.projects.splice(fromIdx, 1);
     const toIdx = week.projects.findIndex(p => p.id === proj.id);
     if (toIdx < 0) return;
-    week.projects.splice(dropAbove ? toIdx : toIdx + 1, 0, moved);
+    week.projects.splice(insertBefore ? toIdx : toIdx + 1, 0, moved);
     save(); render();
   });
 
