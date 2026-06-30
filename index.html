@@ -1219,6 +1219,8 @@ dataRef.on('value', (snapshot) => {
   }
   document.getElementById('loadingScreen').style.display = 'none';
   _initialized = true;
+  // 내가 직접 저장한 변경은 re-render 건너뜀 (스크롤 위치 유지)
+  if (_isSaving) { _isSaving = false; return; }
   try { render(); } catch(e) {
     console.error('렌더링 오류:', e);
     document.getElementById('resetBtn').style.display = 'block';
