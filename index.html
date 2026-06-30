@@ -10,6 +10,8 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    html, body { overflow-x: hidden; }
+
     body {
       font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
       background: #fff;
@@ -160,6 +162,10 @@
     .btn-sort:hover { background: #f7f6f5; color: #37352f; }
 
     /* ── Table ── */
+    .table-scroll-wrap {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
     .meeting-table {
       width: 100%;
       border-collapse: collapse;
@@ -1777,7 +1783,10 @@ function makeMeetingTable(week) {
   const tbody = document.createElement('tbody');
   week.projects.forEach(p => tbody.appendChild(makeRow(week, p)));
   table.appendChild(tbody);
-  frag.appendChild(table);
+  const tableWrap = document.createElement('div');
+  tableWrap.className = 'table-scroll-wrap';
+  tableWrap.appendChild(table);
+  frag.appendChild(tableWrap);
   return frag;
 }
 
