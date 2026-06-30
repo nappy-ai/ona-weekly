@@ -1118,6 +1118,19 @@ function save() {
   }, 500);
 }
 
+// 데이터 마이그레이션 — 잘못된 이름 일괄 수정
+function migrateData(data) {
+  if (!data || !data.weeks) return data;
+  let changed = false;
+  data.weeks.forEach(w => {
+    (w.projects || []).forEach(p => {
+      if (p.name === '포스텔') { p.name = '포스웰'; changed = true; }
+    });
+  });
+  if (changed) dataRef.set(data).catch(e => console.error('마이그레이션 저장 실패:', e));
+  return data;
+}
+
 // Firebase 객체 → 배열 변환 (Firebase는 배열을 객체로 저장하고, 빈 배열은 null로 저장함)
 function fixArrays(data) {
   if (!data) return data;
@@ -1163,7 +1176,7 @@ const _fbTimeout = setTimeout(() => {
 dataRef.on('value', (snapshot) => {
   clearTimeout(_fbTimeout);
   const raw = snapshot.val();
-  const data = fixArrays(raw);
+  const data = migrateData(fixArrays(raw));
   if (data && data.weeks && data.weeks.length > 0) {
     appData = data;
   } else {
