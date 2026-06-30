@@ -677,6 +677,34 @@
       .page { padding: 40px 24px 80px; }
       .detail-panel { width: 90%; min-width: unset; }
     }
+
+    @media (max-width: 700px) {
+      .page { padding: 20px 16px 80px; }
+
+      /* 타이틀 한 줄로 */
+      .page-title { font-size: 22px; letter-spacing: 0; }
+      .page-title-row { margin-bottom: 20px; align-items: flex-start; gap: 10px; }
+
+      /* 헤더 버튼 세로 스택 & 일관된 스타일 */
+      .page-title-row > div { flex-direction: column; gap: 5px; flex-shrink: 0; }
+      #importHistBtn { white-space: nowrap; font-size: 12px !important; padding: 5px 10px !important; }
+      #resetBtn      { white-space: nowrap; font-size: 12px !important; padding: 5px 10px !important; }
+      .add-week-btn  { font-size: 12px; padding: 5px 10px; white-space: nowrap; }
+
+      /* 탭 축소 */
+      .tab-btn { font-size: 12px; padding: 7px 7px; gap: 3px; }
+
+      /* 정렬/프로젝트추가 버튼 → 탭 아래 줄로 wrap */
+      .tabs-bar { flex-wrap: wrap; row-gap: 0; padding-bottom: 0; }
+      .tabs-spacer { display: none; }
+      .btn-sort, .btn-create { font-size: 12px; padding: 5px 10px; margin-bottom: 0; }
+
+      /* 탭↔버튼 24px, 버튼↔표 16px */
+      .tabs-bar > div { margin-top: 24px; margin-bottom: 16px; width: 100%; }
+
+      /* week content 여백 축소 */
+      .week-content { padding: 6px 0 16px 8px; }
+    }
   </style>
 </head>
 <body>
@@ -691,7 +719,6 @@
   <div class="page-title-row">
     <h1 class="page-title">주간 회의록</h1>
     <div style="display:flex;gap:8px;align-items:center">
-      <button id="importHistBtn" onclick="importHistoricalData()" style="padding:6px 12px;border:1px solid #9b9a97;background:white;color:#787774;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit">📥 히스토리 추가</button>
       <button id="resetBtn" onclick="resetData()" style="display:none;padding:6px 12px;border:1px solid #e74c3c;background:white;color:#e74c3c;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit">↺ 데이터 초기화</button>
       <button class="add-week-btn" onclick="showAddWeek()">+ 이번주 생성</button>
     </div>
