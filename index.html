@@ -1263,13 +1263,16 @@ function makeWeek(week) {
     week.projects.sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
     save(); render();
   };
-  tabsBar.appendChild(sortBtn);
+  const btnGroup = document.createElement('div');
+  btnGroup.style.cssText = 'display:flex;align-items:center;gap:8px;';
+  btnGroup.appendChild(sortBtn);
 
   const createBtn = document.createElement('button');
   createBtn.className = 'btn-create';
-  createBtn.textContent = '+ 새로 만들기';
+  createBtn.textContent = '+ 프로젝트 추가';
   createBtn.onclick = () => addProject(week.id);
-  tabsBar.appendChild(createBtn);
+  btnGroup.appendChild(createBtn);
+  tabsBar.appendChild(btnGroup);
   content.appendChild(tabsBar);
 
   // Swappable content area
@@ -1501,11 +1504,6 @@ function makeMeetingTable(week) {
   week.projects.forEach(p => tbody.appendChild(makeRow(week, p)));
   table.appendChild(tbody);
   frag.appendChild(table);
-  const addBtn = document.createElement('button');
-  addBtn.className = 'add-row-btn';
-  addBtn.textContent = '+ 신규 item';
-  addBtn.onclick = () => addProject(week.id);
-  frag.appendChild(addBtn);
   return frag;
 }
 
@@ -1592,12 +1590,6 @@ function makeKanbanCol(week, group, viewType) {
     col.appendChild(makeKanbanCard(week, proj, viewType));
   });
 
-  // Add button
-  const addBtn = document.createElement('button');
-  addBtn.className = 'kanban-add-btn';
-  addBtn.textContent = '+ 신규 item';
-  addBtn.onclick = () => addProject(week.id);
-  col.appendChild(addBtn);
 
   return col;
 }
