@@ -2098,9 +2098,13 @@ function showMemberPicker(anchorEl, currentMembers, onChange) {
     if (!picker.contains(e.target) && !anchorEl.contains(e.target)) {
       picker.remove();
       document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('touchstart', handleOutside);
     }
   }
-  setTimeout(() => document.addEventListener('mousedown', handleOutside), 0);
+  setTimeout(() => {
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('touchstart', handleOutside);
+  }, 0);
 }
 
 // ────────────────────────────────────────────────
