@@ -1219,13 +1219,18 @@ dataRef.on('value', (snapshot) => {
   }
   document.getElementById('loadingScreen').style.display = 'none';
   _initialized = true;
-  // 내가 직접 저장한 변경은 re-render 건너뜀 (스크롤 위치 유지)
-  if (_isSaving) { _isSaving = false; return; }
+  _isSaving = false;
+  // 가로 스크롤 위치 저장 후 렌더링, 완료 후 복원
+  const _prevScrollLeft = document.querySelector('.table-scroll-wrap')?.scrollLeft ?? 0;
   try { render(); } catch(e) {
     console.error('렌더링 오류:', e);
     document.getElementById('resetBtn').style.display = 'block';
     document.getElementById('weeksContainer').innerHTML =
       `<div style="color:#e74c3c;padding:20px">오류가 발생했습니다. "데이터 초기화" 버튼을 눌러주세요.<br><small>${e.message}</small></div>`;
+  }
+  if (_prevScrollLeft > 0) {
+    const _tw = document.querySelector('.table-scroll-wrap');
+    if (_tw) _tw.scrollLeft = _prevScrollLeft;
   }
 }, (error) => {
   clearTimeout(_fbTimeout);
